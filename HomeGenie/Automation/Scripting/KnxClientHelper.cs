@@ -22,9 +22,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
-
+using HomeGenie.Data;
+using HomeGenie.Service;
 using KNXLib;
 using KNXLib.DPT;
 
@@ -38,6 +40,7 @@ namespace HomeGenie.Automation.Scripting
     [Serializable]
     public class KnxClientHelper
     {
+
         public class KnxEndPoint
         {
             public string LocalIp = null;
@@ -51,6 +54,8 @@ namespace HomeGenie.Automation.Scripting
         private Action<string, string> statusReceived;
         private Action<string, string> eventReceived;
         private Action<bool> statusChanged;
+
+
 
         /// <summary>
         /// Set the endpoint to connect to.
@@ -90,22 +95,26 @@ namespace HomeGenie.Automation.Scripting
         /// <param name="localPort">Local port.</param>
         /// <param name="remoteIp">Remote IP.</param>
         /// <param name="remotePort">Remote port.</param>
+        /// <param name="actionMessageCode">
+        ///  Some KNX Routers/Interfaces might need this parameter defined, some need this to be 0x29.
+        ///  Default: 0x00
+        /// </param>
         public KnxClientHelper EndPoint(string localIp, int localPort, string remoteIp, int remotePort)
         {
-            knxEndPoint = new KnxEndPoint() { 
-                LocalIp = localIp, 
-                LocalPort = localPort, 
-                RemoteIp = remoteIp, 
-                RemotePort = remotePort 
+            knxEndPoint = new KnxEndPoint()
+            {
+                LocalIp = localIp,
+                LocalPort = localPort,
+                RemoteIp = remoteIp,
+                RemotePort = remotePort
             };
             return this;
         }
-        
-        /// <summary>
-        /// Connect to the remote host using the specified port.
-        /// </summary>
-        /// <param name="port">Port number.</param>
-        public KnxClientHelper Connect()
+
+        public byte ActionMessageCode { get; set; }
+
+    
+        public KnxClientHelper Connect(string actionMessageCode = "0x00")
         {
             if (knxClient != null)
             {
@@ -134,14 +143,18 @@ namespace HomeGenie.Automation.Scripting
                     knxClient = new KNXConnectionRouting(knxEndPoint.LocalPort);
                 }
             }
+
+            knxClient.ActionMessageCode =Convert.ToByte(new Int32Converter().ConvertFromString(actionMessageCode));
             knxClient.Connect();
+
             knxClient.KNXConnectedDelegate += knxClient_Connected;
             knxClient.KNXDisconnectedDelegate += knxClient_Disconnected;
             knxClient.KNXEventDelegate += knxClient_EventReceived;
             knxClient.KNXStatusDelegate += knxClient_StatusReceived;
+
             return this;
         }
-        
+
         /// <summary>
         /// Disconnects from the remote host.
         /// </summary>
@@ -153,7 +166,8 @@ namespace HomeGenie.Automation.Scripting
                 knxClient.KNXDisconnectedDelegate -= knxClient_Disconnected;
                 knxClient.KNXEventDelegate -= knxClient_EventReceived;
                 knxClient.KNXStatusDelegate -= knxClient_StatusReceived;
-                try { knxClient.Disconnect(); } catch { }
+                try { knxClient.Disconnect(); }
+                catch { }
                 knxClient = null;
             }
             return this;
@@ -191,7 +205,7 @@ namespace HomeGenie.Automation.Scripting
             knxClient.Action(address, data);
             return this;
         }
-        
+
         /// <summary>
         /// Send action data to the specified address.
         /// </summary>
@@ -202,7 +216,7 @@ namespace HomeGenie.Automation.Scripting
             knxClient.Action(address, data);
             return this;
         }
-        
+
         /// <summary>
         /// Send action data to the specified address.
         /// </summary>
@@ -275,7 +289,7 @@ namespace HomeGenie.Automation.Scripting
             statusChanged = statusChangeAction;
             return this;
         }
-                
+
         /// <summary>
         /// Sets the function to call when a new event is received.
         /// </summary>
@@ -295,7 +309,7 @@ namespace HomeGenie.Automation.Scripting
             statusReceived = statusAction;
             return this;
         }
-        
+
         public void Reset()
         {
             knxEndPoint = null;
@@ -312,7 +326,7 @@ namespace HomeGenie.Automation.Scripting
             }
         }
 
-        
+
         private void knxClient_Disconnected()
         {
             if (statusChanged != null)
@@ -328,7 +342,7 @@ namespace HomeGenie.Automation.Scripting
                 eventReceived(address, state);
             }
         }
-        
+
         private void knxClient_StatusReceived(string address, string state)
         {
             if (statusReceived != null)
